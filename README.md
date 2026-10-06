@@ -133,6 +133,12 @@ streamlit run 3_app.py
 
 ---
 
+### [`.devcontainer/devcontainer.json`](https://github.com/whitwaithera/Fraud_detection-Kenya/commit/c3c511d4cbfbd113b88c90d86ba1e9b4a35896ab)
+
+Updated October 6, 2026: corrected the development container's app paths to use `3_app.py`.
+
+---
+
 ## Tech Stack
 
 `Python` `XGBoost` `LightGBM` `SMOTE (imbalanced-learn)` `SHAP` `Streamlit` `Plotly` `Faker` `scikit-learn` `pandas`
