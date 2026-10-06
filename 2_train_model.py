@@ -19,14 +19,12 @@ import os
 import warnings
 warnings.filterwarnings("ignore")
 
-from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import (classification_report, confusion_matrix,
                               roc_auc_score, average_precision_score,
                               precision_recall_curve, roc_curve)
-from sklearn.ensemble import RandomForestClassifier
 from imblearn.over_sampling import SMOTE
-from imblearn.pipeline import Pipeline as ImbPipeline
 import xgboost as xgb
 import lightgbm as lgb
 import shap
@@ -201,10 +199,14 @@ def main():
     print(f"  Fraud rate    : {y.mean()*100:.2f}%")
     print(f"  Fraud count   : {y.sum():,} / {len(y):,}")
 
-    # Train/test split — stratified
-    print("\n[2/6] Splitting data (80/20 stratified)...")
-    X_train, X_test, y_train, y_test = train_test_split(
+    # Stratified train/validation/test split; reserve the test set for final evaluation.
+    print("\n[2/6] Creating stratified train/validation/test splits (72/8/20%)...")
+    X_train_full, X_test, y_train_full, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
+    )
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_train_full, y_train_full, test_size=0.1,
+        random_state=42, stratify=y_train_full
     )
 
     # SMOTE
@@ -232,7 +234,7 @@ def main():
         verbosity=0
     )
     xgb_model.fit(X_train_sm, y_train_sm,
-                  eval_set=[(X_test, y_test)],
+                  eval_set=[(X_val, y_val)],
                   verbose=False)
 
     xgb_pred  = xgb_model.predict(X_test)
@@ -263,7 +265,7 @@ def main():
         verbose=-1
     )
     lgb_model.fit(X_train_sm, y_train_sm,
-                  eval_set=[(X_test, y_test)],
+                  eval_set=[(X_val, y_val)],
                   callbacks=[lgb.early_stopping(50, verbose=False),
                               lgb.log_evaluation(period=-1)])
 
