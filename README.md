@@ -139,6 +139,16 @@ Updated October 6, 2026: corrected the development container's app paths to use 
 
 ---
 
+### [`2_train_model.py`](https://github.com/whitwaithera/Fraud_detection-Kenya/commit/6ce8a02)
+
+Updated October 6, 2026: use a separate validation split for early stopping, keeping the test set reserved for final evaluation.
+
+### [`requirements.txt`](https://github.com/whitwaithera/Fraud_detection-Kenya/commit/270bbc6)
+
+Updated October 6, 2026: group dependencies by purpose and add the requested inline comment.
+
+---
+
 ## Tech Stack
 
 `Python` `XGBoost` `LightGBM` `SMOTE (imbalanced-learn)` `SHAP` `Streamlit` `Plotly` `Faker` `scikit-learn` `pandas`
