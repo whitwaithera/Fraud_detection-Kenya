@@ -12,6 +12,7 @@ Usage:
     python 2_train_model.py
 """
 
+#imports
 import pandas as pd
 import numpy as np
 import joblib
