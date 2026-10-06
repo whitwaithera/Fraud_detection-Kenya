@@ -1,10 +1,8 @@
-# 🛡️ FraudShield Kenya — Financial Fraud Detection with XGBoost + SMOTE
+# FraudShield Kenya — Financial Fraud Detection with XGBoost + SMOTE
 
 An end-to-end machine learning pipeline that detects financial fraud across **M-Pesa mobile money**, **bank account transactions**, and **KRA tax filings** using synthetic Kenyan financial data.
 
 Handles extreme class imbalance (fraud < 1.5% of transactions) using **SMOTE** and achieves **ROC-AUC of 1.00** with **XGBoost** and **LightGBM**.
-
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ammonbelyon-fraudshield-kenya.streamlit.app)
 
 ---
 
@@ -110,12 +108,12 @@ fraud_detection/
 ## Quick Start
 
 ```bash
-git clone https://github.com/AmmonBelyon/fraud-detection-kenya.git
-cd fraud-detection-kenya
+
 pip install -r requirements.txt
 
 # Step 1: Generate synthetic data
 python 1_generate_data.py
+# Dates span January 1 through the current date in the current year.
 
 # Step 2: Train models
 python 2_train_model.py
@@ -145,8 +143,4 @@ streamlit run 3_app.py
 
 Built as part of a data analyst portfolio focused on East African fintech and financial inclusion. The synthetic data models real Kenyan financial patterns — M-Pesa transaction behaviour, KRA PIN formats, county-level geography, and CBK-regulated banking channels.
 
-**Author:** Ammon Belyon | [GitHub](https://github.com/AmmonBelyon)
-
-## License
-
-MIT
+**Author:** Whitney wanjiru

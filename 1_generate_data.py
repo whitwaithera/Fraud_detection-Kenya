@@ -269,13 +269,15 @@ def main():
     print(f"      Fraudulent : {n_fraud:,}")
 
     records = []
-    start_date = datetime(2023, 1, 1)
+    current_date = datetime.now()
+    start_date = datetime(current_date.year, 1, 1)
+    available_days = (current_date.date() - start_date.date()).days
 
     # Legitimate transactions
     for _ in range(n_legit):
         customer = random.choice(customers)
         txn_date = start_date + timedelta(
-            days=random.randint(0, 730),
+            days=random.randint(0, available_days),
             hours=random.randint(0, 23),
             minutes=random.randint(0, 59)
         )
@@ -285,7 +287,7 @@ def main():
     for fraud_type in fraud_type_dist:
         customer = random.choice(customers)
         txn_date = start_date + timedelta(
-            days=random.randint(0, 730),
+            days=random.randint(0, available_days),
             hours=random.randint(0, 23),
             minutes=random.randint(0, 59)
         )
@@ -296,7 +298,7 @@ def main():
     df = pd.DataFrame(records).sample(frac=1, random_state=42).reset_index(drop=True)
     df.to_csv(OUTPUT_FILE, index=False)
 
-    print(f"\n✓ Saved {len(df):,} records → {OUTPUT_FILE}")
+    print(f"\nSaved {len(df):,} records to {OUTPUT_FILE}")
     print(f"\nFraud breakdown:")
     print(df[df["is_fraud"]==1]["fraud_type"].value_counts().to_string())
     print(f"\nTransaction category mix:")

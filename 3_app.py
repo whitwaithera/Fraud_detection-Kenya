@@ -33,6 +33,9 @@ st.markdown("""
 html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
 h1,h2,h3 { font-family: 'DM Serif Display', serif !important; }
 
+.stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"],
+[data-testid="stHeader"] { background-color: #f59e0b !important; }
+
 .dash-header {
     background: linear-gradient(135deg, #1a1714 0%, #2e4a35 100%);
     color: #e8e3da; padding: 1.8rem 2rem; border-radius: 14px;
@@ -77,18 +80,19 @@ h1,h2,h3 { font-family: 'DM Serif Display', serif !important; }
 def load_model():
     model        = joblib.load("models/best_model.pkl")
     feature_cols = joblib.load("models/feature_cols.pkl")
-    return model, feature_cols
+    category_encoder = joblib.load("models/le_category.pkl")
+    channel_encoder  = joblib.load("models/le_channel.pkl")
+    return model, feature_cols, category_encoder, channel_encoder
 
 @st.cache_data
 def load_test_data():
     return pd.read_csv("data/test_set.csv")
 
-model, feature_cols = load_model()
+model, feature_cols, category_encoder, channel_encoder = load_model()
 test_df = load_test_data()
 
 # Add predictions to test set
 test_df["fraud_probability"] = model.predict_proba(test_df[feature_cols])[:, 1]
-test_df["predicted_fraud"]   = (test_df["fraud_probability"] > 0.5).astype(int)
 test_df["risk_level"] = pd.cut(
     test_df["fraud_probability"],
     bins=[0, 0.3, 0.6, 1.0],
@@ -120,7 +124,8 @@ filtered = test_df[
     (test_df["risk_level"].isin(risk_filter)) &
     (test_df["channel"].isin(channel_filter))
 ]
-flagged = test_df[test_df["fraud_probability"] >= threshold]
+flagged = filtered[filtered["fraud_probability"] >= threshold]
+flagged_rate = len(flagged) / len(filtered) * 100 if not filtered.empty else 0
 
 
 # ── Header ─────────────────────────────────────────────────────────────────────
@@ -131,7 +136,7 @@ st.markdown(f"""
     <div class="sub">Real-time fraud scoring · M-Pesa · Bank · KRA · Powered by XGBoost + SMOTE</div>
   </div>
   <div style="text-align:right;color:#a0c8a8;font-size:0.82rem;">
-    {len(test_df):,} transactions analysed<br>
+    {len(filtered):,} transactions match filters<br>
     {len(flagged):,} flagged at {threshold:.0%} threshold
   </div>
 </div>
@@ -140,12 +145,15 @@ st.markdown(f"""
 
 # ── KPI Cards ─────────────────────────────────────────────────────────────────
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Total Transactions",  f"{len(test_df):,}")
+c1.metric("Total Transactions",  f"{len(filtered):,}")
 c2.metric("Flagged as Fraud",    f"{len(flagged):,}",
-          f"{len(flagged)/len(test_df)*100:.1f}% of total")
-c3.metric("Avg Fraud Probability", f"{test_df['fraud_probability'].mean():.3f}")
+          f"{flagged_rate:.1f}% of filtered")
+c3.metric(
+    "Avg Fraud Probability",
+    f"{filtered['fraud_probability'].mean():.3f}" if not filtered.empty else "—"
+)
 c4.metric("High Risk Transactions",
-          f"{len(test_df[test_df['risk_level']=='High']):,}",
+          f"{len(filtered[filtered['risk_level']=='High']):,}",
           "above 60% probability")
 
 
@@ -171,6 +179,8 @@ with tab1:
     flag_display = flag_display.drop("is_fraud", axis=1)
 
     st.dataframe(flag_display, use_container_width=True, height=400)
+    if flagged.empty:
+        st.info("No transactions match the selected filters and fraud probability threshold.")
 
     csv = flagged.to_csv(index=False).encode("utf-8")
     st.download_button("⬇ Export flagged transactions", csv,
@@ -185,7 +195,7 @@ with tab2:
         st.markdown('<div class="section-title">Fraud probability distribution</div>',
                     unsafe_allow_html=True)
         fig = px.histogram(
-            test_df, x="fraud_probability", nbins=50,
+            filtered, x="fraud_probability", nbins=50,
             color_discrete_sequence=["#2e4a35"],
             labels={"fraud_probability": "Fraud Probability"}
         )
@@ -200,7 +210,9 @@ with tab2:
     with col_b:
         st.markdown('<div class="section-title">Fraud by transaction channel</div>',
                     unsafe_allow_html=True)
-        channel_fraud = (test_df.groupby("channel")["predicted_fraud"]
+        channel_fraud = (filtered.assign(
+                            flagged=filtered["fraud_probability"] >= threshold
+                         ).groupby("channel")["flagged"]
                          .agg(["sum","count"])
                          .reset_index()
                          .rename(columns={"sum":"fraud","count":"total"}))
@@ -229,9 +241,10 @@ with tab2:
     with col_d:
         st.markdown('<div class="section-title">Fraud amount distribution</div>',
                     unsafe_allow_html=True)
-        fraud_amounts = test_df[test_df["is_fraud"]==1]["amount"]
-        legit_amounts = test_df[test_df["is_fraud"]==0]["amount"].sample(
-            min(len(fraud_amounts)*3, 3000)
+        fraud_amounts = filtered[filtered["is_fraud"]==1]["amount"]
+        legit_candidates = filtered[filtered["is_fraud"]==0]["amount"]
+        legit_amounts = legit_candidates.sample(
+            min(len(fraud_amounts) * 3, len(legit_candidates), 3000)
         )
         fig4 = go.Figure()
         fig4.add_trace(go.Box(y=np.log1p(fraud_amounts), name="Fraud",
@@ -311,12 +324,14 @@ with tab3:
             "tax_risk":                    (1 - min(declared_ratio, 1)) * 0.5 + min(filing_late/365, 1) * 0.5,
             "declared_vs_expected_ratio":  declared_ratio,
             "filing_days_late":            filing_late,
-            "txn_category_encoded":        ["bank","kra","mpesa"].index(txn_category) if txn_category in ["bank","kra","mpesa"] else 0,
-            "channel_encoded":             hash(channel) % 10,
+            "txn_category_encoded":        int(category_encoder.transform([txn_category])[0]),
+            "channel_encoded":              int(channel_encoder.transform([channel])[0]),
         }
 
         input_df = pd.DataFrame([input_dict])[feature_cols]
-        proba    = model.predict_proba(input_df)[0][1]
+        probabilities = model.predict_proba(input_df)[0]
+        fraud_class_index = list(model.classes_).index(1)
+        proba = probabilities[fraud_class_index]
 
         st.markdown("---")
         r1, r2, r3 = st.columns(3)
@@ -388,6 +403,6 @@ st.markdown("---")
 st.markdown(
     '<p style="font-size:0.75rem;color:#a09890;text-align:center;">'
     'FraudShield Kenya · XGBoost + SMOTE · Synthetic data for demonstration · '
-    'Built by <a href="https://github.com/AmmonBelyon" style="color:#4a7c6f;">Ammon Belyon</a></p>',
+    'Built by <span style="color:#4a7c6f;">Whitney wanjiru</span></p>',
     unsafe_allow_html=True
 )
